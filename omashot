@@ -492,17 +492,12 @@ open_editor() {
   local file="$1"
   [[ -f $file ]] || return 1
 
+  local cmd=()
   if [[ -n $SCREENSHOT_EDITOR ]]; then
-    if [[ $SCREENSHOT_EDITOR == *" "* ]]; then
+    read -ra cmd <<<"$SCREENSHOT_EDITOR"
+    if [[ ${#cmd[@]} -gt 0 ]] && command -v "${cmd[0]}" >/dev/null 2>&1; then
       (
-        bash -lc "$SCREENSHOT_EDITOR \"\$1\"" _ "$file"
-        rm -f -- "$file"
-      ) >/dev/null 2>&1 &
-      return 0
-    fi
-    if command -v "$SCREENSHOT_EDITOR" >/dev/null 2>&1; then
-      (
-        "$SCREENSHOT_EDITOR" "$file"
+        "${cmd[@]}" "$file"
         rm -f -- "$file"
       ) >/dev/null 2>&1 &
       return 0
@@ -644,6 +639,21 @@ publish_recording_filename() {
     rm -f -- "$marker_tmp"
     return 1
   fi
+}
+
+read_recording_filename() {
+  # Mirror the hardening on the write side: never `cat` the marker directly,
+  # because it is a fixed, world-writable path that another local user could
+  # pre-place as a symlink.  Require a regular file owned by this user and
+  # cap its size before trusting its contents.
+  [[ -L $RECORDING_FILE ]] && return 1
+  [[ -f $RECORDING_FILE && -r $RECORDING_FILE ]] || return 1
+  local size owner
+  size=$(/usr/bin/stat -c '%s' "$RECORDING_FILE" 2>/dev/null)
+  owner=$(/usr/bin/stat -c '%u' "$RECORDING_FILE" 2>/dev/null)
+  [[ $size =~ ^[0-9]+$ && $size -gt 0 && $size -le 4096 ]] || return 1
+  [[ $owner == "$(id -u)" ]] || return 1
+  cat "$RECORDING_FILE" 2>/dev/null
 }
 
 install_recording_escape_binding() {
@@ -1011,6 +1021,8 @@ record_geometry() {
   if ! recording_active; then
     remove_recording_escape_binding
     clear_recording_context
+  else
+    return 1
   fi
   require_command gpu-screen-recorder
 
@@ -1076,6 +1088,8 @@ record_screen() {
   if ! recording_active; then
     remove_recording_escape_binding
     clear_recording_context
+  else
+    return 1
   fi
   require_command omarchy-capture-screenrecording
 
@@ -1122,7 +1136,7 @@ stop_recording() {
   remove_recording_escape_binding
   require_command omarchy-capture-screenrecording
   local filename status
-  filename=$(cat "$RECORDING_FILE" 2>/dev/null)
+  filename=$(read_recording_filename)
   STOP_OUTPUT_FILE=$(mktemp "$TMP_DIR/omashot-stop.XXXXXX") ||
     fail "could not create temporary stop output"
 

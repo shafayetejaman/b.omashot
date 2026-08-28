@@ -27,7 +27,7 @@ if [[ ${1:-} == --snapshot ]]; then
   trap cleanup_snapshot EXIT
 
   grim -l 0 -o "$output_name" "$snapshot_file"
-  mv -f -- "$snapshot_file" "$source_file"
+  mv -fT -- "$snapshot_file" "$source_file"
   trap - EXIT
   printf '%s\n' "$source_file"
   exit 0

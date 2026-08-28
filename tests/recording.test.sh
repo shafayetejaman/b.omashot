@@ -6,7 +6,7 @@ PLUGIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 TEST_ROOT=$(mktemp -d)
 STUB_BIN="$TEST_ROOT/bin"
 STATE_ROOT="$TEST_ROOT/state"
-RECORDING_MARKER="$TEST_ROOT/recording-marker"
+MARKER_FILE="/tmp/omarchy-screenrecord-filename"
 OMACUT_LOG="$TEST_ROOT/omacut-args"
 STOP_STDOUT="$TEST_ROOT/stop-stdout"
 INJECTION_SENTINEL="$TEST_ROOT/command-injection-ran"
@@ -16,6 +16,7 @@ TEST_HOME="$TEST_ROOT/home"
 
 cleanup() {
   rm -rf "$TEST_ROOT"
+  rm -f "$MARKER_FILE"
 }
 
 trap cleanup EXIT
@@ -50,7 +51,6 @@ run_omashot() {
       PATH="$STUB_BIN:$PATH" \
       HOME="$TEST_HOME" \
       XDG_STATE_HOME="$STATE_ROOT" \
-      TEST_RECORDING_MARKER="$RECORDING_MARKER" \
       TEST_OMACUT_LOG="$OMACUT_LOG" \
       TEST_STOP_COMPLETE="$STOP_COMPLETE" \
       TEST_ORDERING_ERROR="$ORDERING_ERROR" \
@@ -75,16 +75,8 @@ fi
 if [[ ${1:-} == --stop-recording && -n ${TEST_STOP_OUTPUT:-} ]]; then
   printf '%s\n' "$TEST_STOP_OUTPUT"
 fi
-rm -f "$TEST_RECORDING_MARKER"
+rm -f "$MARKER_FILE"
 exit "${TEST_STOP_STATUS:-0}"
-STUB
-
-cat >"$STUB_BIN/cat" <<'STUB'
-#!/usr/bin/env bash
-if [[ $# == 1 && $1 == /tmp/omarchy-screenrecord-filename ]]; then
-  exec /usr/bin/cat "$TEST_RECORDING_MARKER"
-fi
-exec /usr/bin/cat "$@"
 STUB
 
 cat >"$STUB_BIN/setsid" <<'STUB'
@@ -116,7 +108,7 @@ chmod +x "$STUB_BIN"/*
 
 recording="$TEST_ROOT/screen recording \$(touch command-injection-ran);'\".mp4"
 touch "$recording"
-printf '%s\n' "$recording" >"$RECORDING_MARKER"
+printf '%s\n' "$recording" >"$MARKER_FILE"
 TEST_FINALIZE_FILE="$recording" TEST_STOP_OUTPUT="$recording" \
   run_omashot >"$STOP_STDOUT"
 
@@ -135,7 +127,7 @@ assert_equal "$recording" \
 
 rm -f "$OMACUT_LOG"
 rm -f "$STOP_COMPLETE"
-printf '%s\n' "$recording" >"$RECORDING_MARKER"
+printf '%s\n' "$recording" >"$MARKER_FILE"
 if TEST_FINALIZE_FILE="$recording" TEST_STOP_OUTPUT="$recording" \
   TEST_STOP_STATUS=7 run_omashot >/dev/null; then
   fail "failed stop returned success"
@@ -144,13 +136,13 @@ else
 fi
 [[ ! -e $OMACUT_LOG ]] || fail "Omacut opened after a failed stop"
 
-printf '%s\n' "$recording" >"$RECORDING_MARKER"
+printf '%s\n' "$recording" >"$MARKER_FILE"
 TEST_FINALIZE_FILE="$recording" TEST_STOP_OUTPUT="" \
   run_omashot >/dev/null
 [[ ! -e $OMACUT_LOG ]] || fail "Omacut opened without finalized-path output"
 
 missing_recording="$TEST_ROOT/missing recording.mp4"
-printf '%s\n' "$missing_recording" >"$RECORDING_MARKER"
+printf '%s\n' "$missing_recording" >"$MARKER_FILE"
 TEST_STOP_OUTPUT="$missing_recording" run_omashot >/dev/null
 [[ ! -e $OMACUT_LOG ]] || fail "Omacut opened a missing recording"
 
