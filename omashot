@@ -693,6 +693,15 @@ install_recording_escape_binding() {
 
   local lua
   lua='
+    -- Track every omashot recording binding handle in one registry so an
+    -- install can disable any previous copy that may still be registered, even
+    -- one that survived a mode switch or an earlier install. Disabling (not
+    -- unbinding) keeps unrelated user bindings on the same key intact, while
+    -- guaranteeing exactly one omashot binding is ever enabled -- a stale copy
+    -- can then never intercept or corrupt the passthrough.
+    omashot_all_recording_binds = omashot_all_recording_binds or {}
+    for _, binding in ipairs(omashot_all_recording_binds) do binding:set_enabled(false) end
+
     local function disable_bindings(bindings)
       if not bindings then return end
       for _, binding in ipairs(bindings) do binding:set_enabled(false) end
@@ -733,19 +742,30 @@ install_recording_escape_binding() {
     if not bindings_are_live(bindings, 1) then
       bindings = {}
       omashot_recording_binding_sets.immediate = bindings
-      table.insert(bindings,
-        hl.bind("ESCAPE", function()
-          local now = os.clock()
-          if now - escape_press_time < 1.0 then
-            hl.dispatch(hl.dsp.exec_cmd("omarchy-shell b.omashot stopRecording"))
-          end
-          escape_press_time = now
-        end, {
-          description = "Stop Omashot recording (press twice within 1s)",
-          locked = false,
-          dont_inhibit = false,
-          allow_input_capture = false,
-        }))
+
+      -- A single Escape is swallowed and never forwarded to the focused app. A
+      -- second Escape within the same wall-clock second stops the recording.
+      -- os.time() is used because os.clock() does not advance in real time and
+      -- Hyprland hl.timer does not honor a delay.
+      local escape_binding = hl.bind("ESCAPE", function()
+        local now = os.time()
+        if escape_press_time > 0 and now - escape_press_time < 1 then
+          -- Second press within 1s: stop the recording.
+          escape_press_time = 0
+          hl.dispatch(hl.dsp.exec_cmd("omarchy-shell b.omashot stopRecording"))
+          return
+        end
+        -- First press: swallow it (nothing reaches the app) and remember the
+        -- time so a second press within 1s can stop the recording.
+        escape_press_time = now
+      end, {
+        description = "Double-press ESC within 1s to stop the recording",
+        locked = false,
+        dont_inhibit = false,
+        allow_input_capture = false,
+      })
+      table.insert(bindings, escape_binding)
+      table.insert(omashot_all_recording_binds, escape_binding)
     end
 
     for _, binding in ipairs(bindings) do binding:set_enabled(true) end
@@ -794,6 +814,9 @@ local function bindings_are_live(bindings, expected_count)
   end
   return true
 end
+
+omashot_all_recording_binds = omashot_all_recording_binds or {}
+for _, binding in ipairs(omashot_all_recording_binds) do binding:set_enabled(false) end
 
 omashot_recording_binding_sets = omashot_recording_binding_sets or {}
 for _, bindings in pairs(omashot_recording_binding_sets) do
@@ -875,7 +898,9 @@ local function add_global_binding(bindings, entry, description, repeating, non_c
   -- Hyprland's global dispatcher mirrors both physical states through the
   -- protocol. A second release=true global binding also fires on key-down and
   -- would make every single press appear as a ×2 repeat.
-  table.insert(bindings, hl.bind(entry[1], hl.dsp.global(endpoint), press_options))
+  local handle = hl.bind(entry[1], hl.dsp.global(endpoint), press_options)
+  table.insert(bindings, handle)
+  table.insert(omashot_all_recording_binds, handle)
 end
 
 local bindings = omashot_recording_binding_sets.keystrokes
@@ -943,6 +968,9 @@ remove_recording_escape_binding() {
     hyprctl eval '
       -- Lua handle unbinds match by key and modifier rather than by identity.
       -- Disable our retained handles so unrelated user bindings stay intact.
+      if omashot_all_recording_binds then
+        for _, binding in ipairs(omashot_all_recording_binds) do binding:set_enabled(false) end
+      end
       if omashot_recording_keybinds then
         for _, binding in ipairs(omashot_recording_keybinds) do binding:set_enabled(false) end
         omashot_recording_keybinds = nil
@@ -1158,6 +1186,18 @@ record_screen() {
   truthy "$MICROPHONE_AUDIO" && args+=(--with-microphone-audio)
   truthy "$WEBCAM" && args+=(--with-webcam)
 
+  # omarchy-capture-screenrecording blocks until the recording is stopped, so
+  # install the recording keybinding here (before the recorder) rather than
+  # after -- otherwise a single Escape could never reach the focused app while
+  # the recording is live.
+  local desired="immediate"
+  truthy "$RECORD_KEYSTROKES" && desired="keystrokes"
+  if [[ $desired == "keystrokes" ]]; then
+    install_recording_keystroke_bindings
+  else
+    install_recording_escape_binding
+  fi
+
   OMARCHY_SCREENRECORD_DIR="$output_dir" omarchy-capture-screenrecording "${args[@]}"
   local status=$?
   if ((status == 0)) && recording_active; then
@@ -1197,24 +1237,6 @@ stop_recording() {
     clear_recording_context
   fi
   return "$status"
-}
-
-pass_escape() {
-  command -v hyprctl >/dev/null 2>&1 || return 0
-
-  local modifiers
-  case "$PASS_MODIFIERS" in
-  "" | CTRL | SHIFT | ALT | SUPER | "CTRL + SHIFT" | "CTRL + ALT" | "CTRL + SUPER" | "SHIFT + ALT" | "SHIFT + SUPER" | "ALT + SUPER" | "CTRL + SHIFT + ALT" | "CTRL + SHIFT + SUPER" | "CTRL + ALT + SUPER" | "SHIFT + ALT + SUPER" | "CTRL + SHIFT + ALT + SUPER") modifiers="$PASS_MODIFIERS" ;;
-  *) return 1 ;;
-  esac
-
-  hyprctl eval "
-    local target = hl.get_active_window()
-    if target then
-      hl.dispatch(hl.dsp.send_key_state({ state = \"down\", mods = \"$modifiers\", key = \"ESCAPE\", window = target }))
-      hl.dispatch(hl.dsp.send_key_state({ state = \"up\", mods = \"$modifiers\", key = \"ESCAPE\", window = target }))
-    end
-  " >/dev/null 2>&1
 }
 
 status_json() {
@@ -1273,9 +1295,6 @@ record | recording)
   ;;
 stop | stop-recording)
   stop_recording
-  ;;
-pass-escape)
-  pass_escape
   ;;
 sync-recording-input)
   case "${TARGET,,}" in

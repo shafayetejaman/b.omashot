@@ -123,7 +123,6 @@ Item {
   property double lastKeystrokeAt: 0
   property bool escapeHeld: false
   property bool escapeHoldCompleted: false
-  property string escapePassModifiers: ""
 
   readonly property bool keystrokeOverlayVisible: recording && recordKeystrokes
     && recordingTargetW > 0 && recordingTargetH > 0
@@ -311,13 +310,6 @@ Item {
     return labels
   }
 
-  function activeModifierDispatch() {
-    var labels = activeModifierNames()
-    var dispatch = []
-    for (var i = 0; i < labels.length; i++) dispatch.push(labels[i].toUpperCase())
-    return dispatch.join(" + ")
-  }
-
   function modifierDisplay(name) {
     var requested = String(name || "").toLowerCase()
     for (var i = 0; i < keystrokeCatalog.length; i++) {
@@ -389,22 +381,15 @@ Item {
     if (escapeHeld) return
     escapeHeld = true
     escapeHoldCompleted = false
-    escapePassModifiers = activeModifierDispatch()
     escapeHoldTimer.restart()
   }
 
   function endEscapeHold() {
     if (!escapeHeld) return
 
-    var shouldPass = !escapeHoldCompleted && recording && recordKeystrokes
-    var modifiers = escapePassModifiers
     escapeHeld = false
     escapeHoldCompleted = false
-    escapePassModifiers = ""
     escapeHoldTimer.stop()
-
-    if (shouldPass)
-      runDetached(["pass-escape", "", captureContext("", "", "", "", "", modifiers)])
   }
 
   function keystrokePressed(entry) {
@@ -483,7 +468,6 @@ Item {
     lastKeystrokeAt = 0
     escapeHeld = false
     escapeHoldCompleted = false
-    escapePassModifiers = ""
     if (clearTarget === true) clearRecordingTarget()
   }
 

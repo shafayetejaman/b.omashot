@@ -128,8 +128,11 @@ done
 assert_absent 'release = true' "$HELPER" \
   "global shortcuts have a duplicate explicit release binding"
 assert_equal "1" \
-  "$(rg -c 'table\.insert\(bindings, hl\.bind' <<<"$global_binding_helper")" \
+  "$(rg -c 'local handle = hl\.bind' <<<"$global_binding_helper")" \
   "recording shortcuts are not created as single protocol-aware bindings"
+assert_equal "1" \
+  "$(rg -c 'table\.insert\(bindings, handle\)' <<<"$global_binding_helper")" \
+  "recording shortcut handles are inserted exactly once"
 assert_contains 'expected_binding_count = #ordinary + #modifiers + 1' "$HELPER" \
   "the cached binding set does not validate every shortcut"
 assert_contains 'add_global_binding(bindings, entry, "Track modifier in Omashot recording", false, true)' \
@@ -341,8 +344,12 @@ assert_contains 'escapeHoldTimer.restart()' "$SERVICE" \
   "Escape press does not start the hold timer"
 assert_contains 'escapeHoldTimer.stop()' "$SERVICE" \
   "Escape release does not cancel the hold timer"
-assert_contains 'runDetached(["pass-escape"' "$SERVICE" \
-  "short Escape presses are not forwarded to the active application"
+assert_absent 'pass-escape' "$SERVICE" \
+  "short Escape presses are still forwarded to the active application"
+assert_absent 'send_key_state' "$SERVICE" \
+  "the service still synthesizes Escape keypresses for the focused app"
+assert_absent 'pass-escape' "$HELPER" \
+  "the helper still forwards Escape to the active application"
 assert_contains 'if (recording && service && service.recordKeystrokes) return' "$OVERLAY" \
   "enabled recordings still use the immediate overlay Escape path"
 assert_contains 'Component.onDestruction: root.runDetached(["cleanup-recording-input"])' \
@@ -462,15 +469,6 @@ assert_contains 'omarchy-shell b.omashot stopRecording' "$HYPRCTL_LOG" \
 run_omashot sync-recording-input true
 assert_equal "keystrokes" "$(<"$STATE_ROOT/omashot/recording-escape-bound")" \
   "enabling keystrokes during recording did not restore dynamic bindings"
-
-run_omashot pass-escape "" '{"modifiers":"CTRL + SHIFT"}'
-assert_contains 'state = "down", mods = "CTRL + SHIFT", key = "ESCAPE"' \
-  "$HYPRCTL_LOG" "a short Escape tap does not synthesize key-down"
-assert_contains 'state = "up", mods = "CTRL + SHIFT", key = "ESCAPE"' \
-  "$HYPRCTL_LOG" "a short Escape tap does not synthesize key-up"
-if run_omashot pass-escape "" '{"modifiers":"META"}'; then
-  fail "pass-escape accepted an untrusted modifier expression"
-fi
 
 : >"$LOCK_MARKER"
 run_omashot status >/dev/null

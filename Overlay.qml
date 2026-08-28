@@ -1142,12 +1142,20 @@ Item {
   function captureWholeScreen() {
     if (!service) return
 
-    if (pickerMode && pickerAction !== "record") {
-      takeScreenshot("screen", pickerAction === "clipboard" ? "clipboard" : "file")
+    var wholeScreenGeometry = "0,0 " + Math.round(panel.width) + "x" + Math.round(panel.height)
+
+    if (pickerMode) {
+      if (pickerAction === "record")
+        service.record("screen", demoCaptureHeld, panel.currentScreenName, wholeScreenGeometry)
+      else
+        takeScreenshot("screen", pickerAction === "clipboard" ? "clipboard" : "file")
       return
     }
 
-    takeScreenshot("screen")
+    if (recordingMode)
+      service.record("screen", demoCaptureHeld, panel.currentScreenName, wholeScreenGeometry)
+    else
+      takeScreenshot("screen")
   }
 
   function captureCurrentTarget(screenName) {
@@ -2190,6 +2198,9 @@ Item {
           event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
           root.captureSelectedTarget(panel.currentScreenName)
+          event.accepted = true
+        } else if (event.key === Qt.Key_Tab) {
+          root.setCaptureKind(root.captureKind === "recording" ? "screenshot" : "recording")
           event.accepted = true
         } else if (root.regionEditor && root.handleSelectionKey(event, panel.width, panel.height, panel.currentScreenName)) {
           event.accepted = true

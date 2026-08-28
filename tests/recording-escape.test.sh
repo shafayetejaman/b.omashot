@@ -75,8 +75,20 @@ run_omashot record screen
 
 grep -Fq 'hl.bind("ESCAPE"' "$HYPRCTL_LOG" ||
   fail "starting a recording did not bind Escape"
+source_install_at=$(grep -n 'install_recording_escape_binding' "$PLUGIN_DIR/omashot" | head -1 | cut -d: -f1)
+source_recorder_at=$(grep -n 'omarchy-capture-screenrecording' "$PLUGIN_DIR/omashot" | head -1 | cut -d: -f1)
+[[ -n $source_install_at && -n $source_recorder_at && $source_install_at -lt $source_recorder_at ]] ||
+  fail "the recording keybinding must be installed before the blocking recorder starts"
 grep -Fq 'omarchy-shell b.omashot stopRecording' "$HYPRCTL_LOG" ||
   fail "Escape was not bound to the Omashot stop action"
+! grep -Fq 'send_key_state' "$HYPRCTL_LOG" ||
+  fail "a single Escape press is still passed through to the focused app"
+! grep -Fq 'escape_passthrough_pending' "$HYPRCTL_LOG" ||
+  fail "the Escape passthrough scheduling is still present"
+grep -Fq 'now - escape_press_time < 1' "$HYPRCTL_LOG" ||
+  fail "a second Escape press does not stop the recording within 1s"
+grep -Fq 'escape_press_time = now' "$HYPRCTL_LOG" ||
+  fail "a single Escape press does not record its press time for the double-press window"
 [[ -e $STATE_ROOT/omashot/recording-escape-bound ]] ||
   fail "the active Escape binding was not tracked"
 
