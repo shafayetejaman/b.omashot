@@ -62,13 +62,12 @@ run_omashot() {
 write_settings() {
   local enabled="$1"
   jq -n --argjson enabled "$enabled" '{
-    version: 1,
-    plugins: [{id: "b.omashot", recordKeystrokes: $enabled}]
-  }' >"$TEST_HOME/.config/omarchy/shell.json"
+    recordKeystrokes: $enabled
+  }' >"$TEST_ROOT/state/omarchy/omashot.json"
 }
 
 # Public state and UI surface.
-assert_contains 'readonly property bool recordKeystrokes: setting("recordKeystrokes", false) === true' \
+assert_contains 'readonly property bool recordKeystrokes: omaSetting("recordKeystrokes", false) === true' \
   "$SERVICE" "recordKeystrokes does not default to off"
 assert_contains 'recordKeystrokes: recordKeystrokes,' "$SERVICE" \
   "service status omits recordKeystrokes"
@@ -368,10 +367,16 @@ assert_contains 'font.pixelSize: Style.font.body * 3' "$KEYSTROKE_OVERLAY" \
 assert_absent 'Behavior on opacity' "$KEYSTROKE_OVERLAY" \
   "the key row fades instead of clearing abruptly"
 
-mkdir -p "$TEST_HOME/.config/omarchy" "$STUB_BIN"
+mkdir -p "$TEST_HOME/.config/omarchy" "$TEST_ROOT/state/omarchy" "$STUB_BIN"
 
-jq -n '{version: 1, plugins: [{id: "b.omashot"}]}' \
-  >"$TEST_HOME/.config/omarchy/shell.json"
+# shell.json for video save location
+jq -n '{
+  version: 1,
+  plugins: [{id: "b.omashot", videoSaveLocation: "videos"}]
+}' >"$TEST_HOME/.config/omarchy/shell.json"
+
+# omashot.json for other settings
+jq -n '{}' >"$TEST_ROOT/state/omarchy/omashot.json"
 
 cat >"$STUB_BIN/omarchy-capture-screenrecording" <<'STUB'
 #!/usr/bin/env bash

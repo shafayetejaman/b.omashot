@@ -48,7 +48,7 @@ assert_absent 'labelText: "Measure"' \
   "the measurement toggle still uses a text label"
 assert_contains 'onClicked: root.toggleMeasurementMode()' \
   "the measurement toggle is not interactive"
-assert_service_contains 'readonly property bool measurementModeEnabled: setting("measurementModeEnabled", false) === true' \
+assert_service_contains 'readonly property bool measurementModeEnabled: omaSetting("measurementModeEnabled", false) === true' \
   "measurement mode has no persisted preference"
 assert_service_contains 'function setMeasurementModeEnabled(value)' \
   "measurement mode has no preference setter"

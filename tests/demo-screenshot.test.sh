@@ -65,18 +65,20 @@ capture_line=$(rg -n --fixed-strings 'return runDetached(args)' <<<"$launch_capt
 [[ -n $hide_line && -n $capture_line && $hide_line -lt $capture_line ]] ||
   fail "ordinary captures do not hide the overlay before continuing"
 
-mkdir -p "$TEST_HOME/.config/omarchy" "$STUB_BIN" "$OUTPUT_DIR"
+mkdir -p "$TEST_HOME/.config/omarchy" "$STUB_BIN" "$OUTPUT_DIR" "$TEST_ROOT/state/omarchy"
 
+# shell.json for save location
 jq -n --arg output "$OUTPUT_DIR" '{
   version: 1,
-  plugins: [{
-    id: "b.omashot",
-    outputMode: "clipboard",
-    saveLocation: $output,
-    timerSeconds: 10,
-    includeCursor: true
-  }]
+  plugins: [{id: "b.omashot", screenshotSaveLocation: $output}]
 }' >"$TEST_HOME/.config/omarchy/shell.json"
+
+# omashot.json for other settings
+jq -n '{
+  outputMode: "clipboard",
+  timerSeconds: 10,
+  includeCursor: true
+}' >"$TEST_ROOT/state/omarchy/omashot.json"
 
 cat >"$STUB_BIN/grim" <<'STUB'
 #!/usr/bin/env bash

@@ -16,17 +16,96 @@ Item {
   readonly property string sourceDir: manifest && manifest.__sourceDir ? String(manifest.__sourceDir) : ""
   readonly property string helperPath: sourceDir ? sourceDir + "/omashot" : Qt.resolvedUrl("omashot").toString().replace(/^file:\/\//, "")
 
-  readonly property var pluginSettings: currentSettings()
-  readonly property string captureMode: setting("captureMode", "selection")
-  readonly property string outputMode: setting("outputMode", "file-and-clipboard")
-  readonly property string saveLocation: normalizeSaveLocation(setting("saveLocation", "pictures"))
-  readonly property int timerSeconds: clampInt(setting("timerSeconds", 0), 0, 60)
-  readonly property bool includeCursor: setting("includeCursor", false) === true
-  readonly property bool recordDesktopAudio: setting("recordDesktopAudio", false) === true
-  readonly property bool recordMicrophoneAudio: setting("recordMicrophoneAudio", false) === true
-  readonly property bool recordWebcam: setting("recordWebcam", false) === true
-  readonly property bool recordKeystrokes: setting("recordKeystrokes", false) === true
-  readonly property bool measurementModeEnabled: setting("measurementModeEnabled", false) === true
+  function shellSettings() {
+    var config = shell && shell.shellConfig ? shell.shellConfig : null
+    var plugins = config && Array.isArray(config.plugins) ? config.plugins : []
+    for (var i = 0; i < plugins.length; i++) {
+      var entry = plugins[i]
+      if (entry && String(entry.id || "") === pluginId) return entry
+    }
+    return {}
+  }
+
+  property var omaSettingsObject: ({})
+
+  function omaSettings() {
+    return omaSettingsObject || ({})
+  }
+
+  function applyOmaSettings(raw) {
+    var obj = {}
+    try { obj = JSON.parse(String(raw || "{}").trim() || "{}") || {} } catch (e) { obj = {} }
+    omaSettingsObject = obj
+  }
+
+  function readOmaSettings() {
+    if (settingsProc.running || !helperPath) return
+    settingsProc.command = ["bash", helperPath, "settings-json"]
+    settingsProc.running = true
+  }
+
+  function writeOmaSettings(nextValues) {
+    var merged = {}
+    var current = omaSettings()
+    for (var key in current) merged[key] = current[key]
+    for (var nkey in nextValues) merged[nkey] = nextValues[nkey]
+    omaSettingsObject = merged
+    for (var k in nextValues) {
+      runDetached(["set-setting", k, JSON.stringify(nextValues[k])])
+    }
+    return true
+  }
+
+  function setting(name, fallback) {
+    var entry = shellSettings()
+    var value = entry ? entry[name] : undefined
+    return value === undefined || value === null ? fallback : value
+  }
+
+  function omaSetting(name, fallback) {
+    var settings = omaSettings()
+    var value = settings[name]
+    return value === undefined || value === null ? fallback : value
+  }
+
+  function saveSettings(nextValues) {
+    var hasShellKeys = false
+    for (var key in nextValues) {
+      if (key === "screenshotSaveLocation" || key === "videoSaveLocation") {
+        hasShellKeys = true
+        break
+      }
+    }
+
+    if (hasShellKeys) {
+      if (!shell || typeof shell.updateEntryInline !== "function") return false
+
+      var next = {}
+      var current = shellSettings()
+      for (var key in current) {
+        if (key !== "id") next[key] = current[key]
+      }
+      for (var nkey in nextValues) {
+        if (nkey !== "id") next[nkey] = nextValues[nkey]
+      }
+
+      return shell.updateEntryInline(pluginId, next)
+    } else {
+      return writeOmaSettings(nextValues)
+    }
+  }
+
+  readonly property string screenshotSaveLocation: normalizeSaveLocation(setting("screenshotSaveLocation", "pictures"))
+  readonly property string videoSaveLocation: normalizeSaveLocation(setting("videoSaveLocation", "videos"))
+  readonly property string captureMode: omaSetting("captureMode", "selection")
+  readonly property string outputMode: omaSetting("outputMode", "file-and-clipboard")
+  readonly property int timerSeconds: clampInt(omaSetting("timerSeconds", 0), 0, 60)
+  readonly property bool includeCursor: omaSetting("includeCursor", false) === true
+  readonly property bool recordDesktopAudio: omaSetting("recordDesktopAudio", false) === true
+  readonly property bool recordMicrophoneAudio: omaSetting("recordMicrophoneAudio", false) === true
+  readonly property bool recordWebcam: omaSetting("recordWebcam", false) === true
+  readonly property bool recordKeystrokes: omaSetting("recordKeystrokes", false) === true
+  readonly property bool measurementModeEnabled: omaSetting("measurementModeEnabled", false) === true
 
   property bool recording: false
   property string lastStatus: "{}"
@@ -169,36 +248,6 @@ Item {
         || symbolic === "documents" || symbolic === "downloads") return symbolic
     if (requested.charAt(0) === "/") return requested
     return "pictures"
-  }
-
-  function currentSettings() {
-    var config = shell && shell.shellConfig ? shell.shellConfig : null
-    var plugins = config && Array.isArray(config.plugins) ? config.plugins : []
-    for (var i = 0; i < plugins.length; i++) {
-      var entry = plugins[i]
-      if (entry && String(entry.id || "") === pluginId) return entry
-    }
-    return {}
-  }
-
-  function setting(name, fallback) {
-    var value = pluginSettings ? pluginSettings[name] : undefined
-    return value === undefined || value === null ? fallback : value
-  }
-
-  function saveSettings(nextValues) {
-    if (!shell || typeof shell.updateEntryInline !== "function") return false
-
-    var next = {}
-    var current = pluginSettings || {}
-    for (var key in current) {
-      if (key !== "id") next[key] = current[key]
-    }
-    for (var nkey in nextValues) {
-      if (nkey !== "id") next[nkey] = nextValues[nkey]
-    }
-
-    return shell.updateEntryInline(pluginId, next)
   }
 
   function captureContext(geometry, screenName, outputOverride, freezePid, targetGeometry, modifiers) {
@@ -594,7 +643,8 @@ Item {
       recording: recording,
       captureMode: captureMode,
       outputMode: outputMode,
-      saveLocation: saveLocation,
+      screenshotSaveLocation: screenshotSaveLocation,
+      videoSaveLocation: videoSaveLocation,
       timerSeconds: timerSeconds,
       includeCursor: includeCursor,
       recordDesktopAudio: recordDesktopAudio,
@@ -627,9 +677,15 @@ Item {
     return next
   }
 
-  function setSaveLocation(value) {
+  function setScreenshotSaveLocation(value) {
     var next = normalizeSaveLocation(value)
-    saveSettings({ saveLocation: next })
+    saveSettings({ screenshotSaveLocation: next })
+    return next
+  }
+
+  function setVideoSaveLocation(value) {
+    var next = normalizeSaveLocation(value)
+    saveSettings({ videoSaveLocation: next })
     return next
   }
 
@@ -754,6 +810,21 @@ Item {
     }
   }
 
+  Process {
+    id: settingsProc
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.applyOmaSettings(text)
+      }
+    }
+  }
+
+  Component.onCompleted: {
+    root.readOmaSettings()
+  }
+
   GlobalShortcut {
     appid: root.pluginId
     name: "show"
@@ -850,7 +921,8 @@ Item {
     function openLast(): string { return root.openLast() }
 
     function outputMode(value: string): string { return root.setOutputMode(value) }
-    function saveLocation(value: string): string { return root.setSaveLocation(value) }
+    function screenshotSaveLocation(value: string): string { return root.setScreenshotSaveLocation(value) }
+    function videoSaveLocation(value: string): string { return root.setVideoSaveLocation(value) }
     function timer(value: string): string { return root.setTimer(value) }
     function cursor(value: string): string { return root.setIncludeCursor(value) }
     function desktopAudio(value: string): string { return root.setRecordDesktopAudio(value) }

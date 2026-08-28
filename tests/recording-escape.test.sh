@@ -31,10 +31,16 @@ run_omashot() {
     "$PLUGIN_DIR/omashot" "$@"
 }
 
-mkdir -p "$STUB_BIN" "$TEST_HOME/.config/omarchy"
+mkdir -p "$TEST_HOME/.config/omarchy" "$STUB_BIN" "$TEST_ROOT/state/omarchy"
 
-jq -n '{version: 1, plugins: [{id: "b.omashot"}]}' \
-  >"$TEST_HOME/.config/omarchy/shell.json"
+# shell.json for video save location
+jq -n '{
+  version: 1,
+  plugins: [{id: "b.omashot", videoSaveLocation: "videos"}]
+}' >"$TEST_HOME/.config/omarchy/shell.json"
+
+# omashot.json for other settings
+jq -n '{}' >"$TEST_ROOT/state/omarchy/omashot.json"
 
 cat >"$STUB_BIN/omarchy-capture-screenrecording" <<'STUB'
 #!/usr/bin/env bash

@@ -2,9 +2,54 @@
 
 Omashot is a screenshot and screen-recording overlay, inspired by macOS and Spectacle.
 
+## Configuration
+
+Omashot uses a split configuration:
+
+- **`~/.config/omarchy/shell.json`** (under the `b.omashot` plugin entry) — save locations only
+- **`~/.local/state/omarchy/omashot.json`** — all other settings
+
+### shell.json (save locations)
+
+```json
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "b.omashot",
+      "screenshotSaveLocation": "~/Pictures/Screenshots",
+      "videoSaveLocation": "~/Videos/Captures"
+    }
+  ]
+}
+```
+
+**Save location options:**
+- `screenshotSaveLocation` — a directory path (absolute, or `~`-prefixed). Defaults to `~/Pictures`.
+- `videoSaveLocation` — a directory path (absolute, or `~`-prefixed). Defaults to `~/Videos`.
+
+### omashot.json (other settings)
+
+```json
+{
+  "outputMode": "file-and-clipboard",
+  "timerSeconds": 0,
+  "includeCursor": false,
+  "editorCommand": "tensaku-edit",
+  "recordDesktopAudio": false,
+  "recordMicrophoneAudio": false,
+  "recordWebcam": false,
+  "recordKeystrokes": false,
+  "captureMode": "selection",
+  "measurementModeEnabled": false
+}
+```
+
+**Output modes:** `file-and-clipboard`, `file`, `clipboard`, `editor`
+
 ## Annotations and Editing
 
-Omashot uses Omarchy's built-in tools, which do what they do best. To annotate a screenshot, first select `Save: Editor` from the toolbar. If you have a workflow that involves Pinta, GIMP, et al, you can set `editorCommand` in `~/.config/omarchy/shell.json`.
+Omashot uses Omarchy's built-in tools, which do what they do best. To annotate a screenshot, first select `Save: Editor` from the toolbar. If you have a workflow that involves Pinta, GIMP, et al, you can set `editorCommand` in `~/.local/state/omarchy/omashot.json`.
 
 All completed screen recordings open automatically in Omacut.
 
@@ -32,7 +77,7 @@ omarchy plugin add https://github.com/shafayetejaman/b.omashot.git
 
 * Press `Space` to capture the whole screen at any time.
 * Press `Enter` to capture a highlighted window or a region.
-* Press `Escape` to end a screen recording. When Keystroke Display is enabled, hold `Escape` for two seconds.
+* Press `Escape` twice within 1 second to end a screen recording. When Keystroke Display is enabled, hold `Escape` for two seconds.
 
 ### Tweak Region Sizing and Position with the Keyboard
 

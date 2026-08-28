@@ -127,12 +127,10 @@ assert_contains 'onActivated: root.captureWholeScreen()' "the Space shortcut is 
 
 assert_absent '{ value: "desktop", label: "Desktop" }' \
   "Desktop is still offered as a capture destination"
-assert_contains 'readonly property bool fileDestinationVisible: recordingMode || !service' \
-  "the file destination does not account for recording mode"
-assert_contains 'service.outputMode === "file" || service.outputMode === "file-and-clipboard"' \
-  "the file destination is not limited to file-producing screenshot modes"
-assert_contains 'visible: root.fileDestinationVisible' \
-  "the Location dropdown does not follow the selected Save mode"
+assert_absent 'label: "Location"' \
+  "Location dropdown should be removed"
+assert_absent 'iconText: "󰉋"' \
+  "Location dropdown icon should be removed"
 
 assert_contains 'property bool recordingPresentation: false' \
   "the overlay does not track the persistent recording scrim"

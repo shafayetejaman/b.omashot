@@ -29,7 +29,7 @@ assert_equal() {
     fail "$message (expected '$expected', got '$actual')"
 }
 
-mkdir -p "$STUB_BIN" "$TEST_HOME/.config/omarchy"
+mkdir -p "$STUB_BIN" "$TEST_HOME/.config/omarchy" "$TEST_ROOT/state/omarchy"
 
 cat >"$STUB_BIN/omarchy-capture-screenrecording" <<'STUB'
 #!/usr/bin/env bash
@@ -76,31 +76,45 @@ run_screenshot() {
     "$PLUGIN_DIR/omashot" screenshot screen >/dev/null
 }
 
-write_settings() {
-  local location="$1"
-  jq -n --arg location "$location" '{
+write_shell_settings() {
+  local screenshot_loc="$1" video_loc="$2"
+  jq -n --arg sl "$screenshot_loc" --arg vl "$video_loc" '{
     version: 1,
-    plugins: [{id: "b.omashot", outputMode: "file", saveLocation: $location}]
+    plugins: [{id: "b.omashot", screenshotSaveLocation: $sl, videoSaveLocation: $vl}]
   }' >"$TEST_HOME/.config/omarchy/shell.json"
 }
 
-write_settings pictures
+write_oma_settings() {
+  local output_mode="$1"
+  jq -n --arg om "$output_mode" '{
+    outputMode: $om
+  }' >"$TEST_ROOT/state/omarchy/omashot.json"
+}
+
+# Test recording with different video save locations from shell.json
+write_shell_settings "$PICTURES_DIR" "$PICTURES_DIR"
+write_oma_settings "file"
+run_recording
+assert_equal "$PICTURES_DIR" "$(<"$DESTINATION_LOG")" \
+  "the recording save location did not resolve to the Pictures path"
+
+write_shell_settings "$PICTURES_DIR" "$VIDEOS_DIR"
+write_oma_settings "file"
 run_recording
 assert_equal "$VIDEOS_DIR" "$(<"$DESTINATION_LOG")" \
-  "the recording-mode Pictures entry did not resolve to Videos"
+  "the Videos destination did not resolve to the given path"
 
-write_settings videos
-run_recording
-assert_equal "$VIDEOS_DIR" "$(<"$DESTINATION_LOG")" \
-  "the Videos destination did not resolve to the XDG Videos directory"
-
-write_settings desktop
+# Test screenshot with different screenshot save locations from shell.json
+write_shell_settings "$PICTURES_DIR" "$VIDEOS_DIR"
+write_oma_settings "file"
 run_screenshot
 [[ $(<"$SCREENSHOT_DESTINATION_LOG") == "$PICTURES_DIR"/screenshot-*.png ]] ||
-  fail "the retired Desktop destination did not fall back to Pictures"
+  fail "the screenshot save location did not resolve to the given path"
 
+write_shell_settings "$PICTURES_DIR" "$VIDEOS_DIR/subdir"
+write_oma_settings "file"
 run_recording
-assert_equal "$VIDEOS_DIR" "$(<"$DESTINATION_LOG")" \
-  "the retired Desktop destination did not fall back to Videos"
+assert_equal "$VIDEOS_DIR/subdir" "$(<"$DESTINATION_LOG")" \
+  "a nested recording save location did not resolve correctly"
 
 printf 'PASS: capture destinations\n'

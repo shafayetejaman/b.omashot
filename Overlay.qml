@@ -91,8 +91,6 @@ Item {
 
   readonly property bool recordingMode: captureKind === "recording"
   readonly property bool recording: service && service.recording === true
-  readonly property bool fileDestinationVisible: recordingMode || !service
-    || service.outputMode === "file" || service.outputMode === "file-and-clipboard"
   readonly property bool pickerMode: pickerAction !== ""
   readonly property bool targetDiscoveryMode: !regionOnlyPicker && !recordingPresentation
   readonly property bool regionEditor: true
@@ -2306,29 +2304,6 @@ Item {
             { value: "editor", label: "Editor" }
           ]
           onChanged: function(value) { if (service) service.setOutputMode(value) }
-        }
-
-        IconDropdown {
-          label: "Location"
-          iconText: "󰉋"
-          visible: root.fileDestinationVisible
-          width: toolbar.dropdownButtonWidth
-          popupWidth: Style.space(150)
-          value: service
-            ? (root.recordingMode && service.saveLocation === "pictures" ? "videos" : service.saveLocation)
-            : (root.recordingMode ? "videos" : "pictures")
-          options: root.recordingMode ? [
-            { value: "videos", label: "Videos" },
-            { value: "documents", label: "Documents" },
-            { value: "downloads", label: "Downloads" }
-          ] : [
-            { value: "pictures", label: "Pictures" },
-            { value: "documents", label: "Documents" },
-            { value: "downloads", label: "Downloads" }
-          ]
-          onChanged: function(value) {
-            if (service) service.setSaveLocation(root.recordingMode && value === "videos" ? "pictures" : value)
-          }
         }
 
         IconDropdown {

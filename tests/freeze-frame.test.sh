@@ -43,17 +43,19 @@ assert_stopped() {
   fail "$message"
 }
 
-mkdir -p "$STUB_BIN" "$OUTPUT_DIR" "$TEST_HOME/.config/omarchy"
+mkdir -p "$STUB_BIN" "$OUTPUT_DIR" "$TEST_HOME/.config/omarchy" "$TEST_ROOT/state/omarchy"
 
+# shell.json for screenshot save location
 jq -n --arg output "$OUTPUT_DIR" '{
   version: 1,
-  plugins: [{
-    id: "b.omashot",
-    outputMode: "file",
-    saveLocation: $output,
-    timerSeconds: 0
-  }]
+  plugins: [{id: "b.omashot", screenshotSaveLocation: $output}]
 }' >"$TEST_HOME/.config/omarchy/shell.json"
+
+# omashot.json for other settings
+jq -n '{
+  outputMode: "file",
+  timerSeconds: 0
+}' >"$TEST_ROOT/state/omarchy/omashot.json"
 
 cat >"$STUB_BIN/grim" <<'STUB'
 #!/usr/bin/env bash
