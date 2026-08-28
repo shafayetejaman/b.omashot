@@ -17,7 +17,7 @@ All completed screen recordings open automatically in Omacut.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/brianblakely/omashot.git
+omarchy plugin add https://github.com/shafayetejaman/b.omashot.git
 ```
 
 ## Usage
