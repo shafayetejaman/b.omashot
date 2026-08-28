@@ -75,9 +75,10 @@ omarchy plugin add https://github.com/shafayetejaman/b.omashot.git
 
 ### Quick Capture Hotkeys
 
-* Press `Space` to capture the whole screen at any time.
+* Press `Tab` to switch between the screenshot and video-record tabs.
+* Press `Space` to capture the whole screen (on the screenshot tab) or to start a fullscreen screen recording (on the video-record tab).
 * Press `Enter` to capture a highlighted window or a region.
-* Press `Escape` twice within 1 second to end a screen recording. A single press passes `Escape` through to the focused app after a 1-second delay. When Keystroke Display is enabled, hold `Escape` for two seconds.
+* Press `Escape` twice within 1 second to end a screen recording. A single press is swallowed and never reaches the focused app. When Keystroke Display is enabled, hold `Escape` for two seconds to end the recording.
 
 ### Tweak Region Sizing and Position with the Keyboard
 
