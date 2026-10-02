@@ -898,6 +898,9 @@ Item {
     function copySelection(): string { return root.copySelection() }
     function copyWindow(): string { return root.screenshot("window", "clipboard") }
 
+    function editScreen(): string { return root.screenshot("screen", "editor") }
+    function editWindow(): string { return root.screenshot("window", "editor") }
+
     function recordScreen(): string { return root.record("screen") }
     function recordSelection(): string { return root.recordSelection() }
     function stopRecording(): string { return root.stopRecording() }

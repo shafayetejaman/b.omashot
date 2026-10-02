@@ -101,6 +101,8 @@ o.bind("PRINT", "Omashot", "omarchy-shell b.omashot show")
 * `omarchy-shell b.omashot captureWindow`
 * `omarchy-shell b.omashot captureToFile`
 * `omarchy-shell b.omashot captureToClipboard`
+* `omarchy-shell b.omashot editScreen`
+* `omarchy-shell b.omashot editWindow`
 * `omarchy-shell b.omashot record`
 * `omarchy-shell b.omashot stopRecording`
 * `omarchy-shell b.omashot keystrokes true`
